@@ -50,7 +50,7 @@ func appendHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If there's a conflict in the term for the previous log, delete all
+	// If there's a conflict in the term for the previous log, reject
 	if ae.PrevLogTerm != entry.Term {
 		ar.Write(w)
 		return
