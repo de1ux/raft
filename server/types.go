@@ -1,6 +1,7 @@
 package server
 
 import (
+    "fmt"
     "bytes"
     "net/http"
     "io/ioutil"
@@ -10,6 +11,16 @@ import (
 type Role string
 const Leader Role = "LEADER"
 const Follower Role = "FOLLOWER"
+
+// TODO - clean this up
+func CreateNewState() *State {
+    return &State{
+        currentTerm: 0,
+        commitIndex: 0,
+        lastApplied: 0,
+        log: &Log{},
+    }
+}
 
 type State struct {
     /***************************************/
@@ -23,7 +34,7 @@ type State struct {
     votedFor    int
     // log is the list of commands to be applied to the state machine, each including
     // the term when the entry was received by the leader. First index is 1
-    log         []Log
+    log         *Log
 
     /*************************************/
     /*** Volatile state on all servers ***/
@@ -52,26 +63,94 @@ type State struct {
     role Role
 }
 
-type Log struct {
-    Term int
-    Data []byte
+// Commit is responsible for applying a set of AppendEntries to the log
+func (s *State) Commit(ae *AppendEntries) {
+    keep := s.log.Length()
+    // If the follower has more records, verify the terms are correct
+    if s.log.Length() > ae.PrevLogIndex {
+        for i := 0; i < len(ae.Entries); i++ {
+            existingEntry := s.log.At(i + ae.PrevLogIndex)
+            if existingEntry == nil {
+                break
+            }
+            if existingEntry.Term != ae.Entries[i].Term {
+                keep = i + ae.PrevLogIndex
+                break
+            }
+        }
+    }
+
+    s.log.Rollback(keep)
+    s.log.Append(ae.Entries)
 }
 
-// AppendEntry is sent to followers by the leader
-type AppendEntry struct {
+func (s *State) EntriesToString() string {
+    return s.log.String()
+}
+
+// Log is an encaspulation of the entries and includes helper functions for safely
+// getting/setting entry data
+type Log struct {
+    entries []Entry
+}
+
+func (l *Log) String() string {
+    return fmt.Sprintf("%+v", l.entries)
+}
+
+func (l *Log) Rollback(count int) {
+    l.entries = l.entries[0:count]
+}
+
+func (l *Log) Append(entries []Entry) {
+    l.entries = append(l.entries, entries...)
+}
+
+func (l *Log) Length() int {
+    return len(l.entries)
+}
+
+func (l *Log) At(index int) *Entry {
+    if index >= len(l.entries) {
+        return nil
+    }
+    return &l.entries[index]
+}
+
+func (l *Log) AtIndexAndTerm(index, term int) *Entry {
+    entry := l.At(index)
+    if entry == nil {
+        return nil
+    }
+    if entry.Term != term {
+        return nil
+    }
+    return entry
+}
+
+type Entry struct {
+    Term int
+    Data []byte
+
+}
+
+// AppendEntries is sent to followers by the leader
+type AppendEntries struct {
     // Term is the leaders Term
     Term int
     // LeaderID is given to remind followers where clients can redirect their writes to
     LeaderID string
     // PrevLogIndex term of the previousLogIndex entry
     PrevLogIndex int
+    // PrevLogTerm is the previous term the follower should have entries for
+    PrevLogTerm int
     // Entries is the log of entries to store. Empty for heartbeat
-    Entries []Log
+    Entries []Entry
     // LeaderCommit is the leaders commitIndex
     LeaderCommit int
 }
 
-func (ae *AppendEntry) ToRequest(URL string) (*http.Request, error) {
+func (ae *AppendEntries) ToRequest(URL string) (*http.Request, error) {
     b, err := json.Marshal(ae)
     if err != nil {
         return nil, err
@@ -80,8 +159,8 @@ func (ae *AppendEntry) ToRequest(URL string) (*http.Request, error) {
     return http.NewRequest("POST", URL, bReader)
 }
 
-func AppendEntryFromRequest(req *http.Request) (*AppendEntry, error) {
-    ae := &AppendEntry{}
+func AppendEntriesFromRequest(req *http.Request) (*AppendEntries, error) {
+    ae := &AppendEntries{}
     b, err := ioutil.ReadAll(req.Body)
     if err != nil {
         return nil, err
@@ -92,16 +171,16 @@ func AppendEntryFromRequest(req *http.Request) (*AppendEntry, error) {
     return ae, nil
 }
 
-// AppendEntryResponse is the reply to the leader following an AppendEntry request
-type AppendEntryResponse struct {
+// AppendEntriesResponse is the reply to the leader following an AppendEntries request
+type AppendEntriesResponse struct {
     // Success is true if the entry was appended on the follower
     Success bool
     // Term that the follower recognizes
     Term int
 }
 
-// Write returns the response from the AppendEntry RPC
-func (ar *AppendEntryResponse) Write(w http.ResponseWriter) error {
+// Write returns the response from the AppendEntries RPC
+func (ar *AppendEntriesResponse) Write(w http.ResponseWriter) error {
     b, err := json.Marshal(ar)
     if err != nil {
         return err
@@ -110,8 +189,8 @@ func (ar *AppendEntryResponse) Write(w http.ResponseWriter) error {
     return nil
 }
 
-func AppendEntryResponseFromRequest(resp *http.Response) (*AppendEntryResponse, error) {
-    ar := &AppendEntryResponse{}
+func AppendEntriesResponseFromRequest(resp *http.Response) (*AppendEntriesResponse, error) {
+    ar := &AppendEntriesResponse{}
     b, err := ioutil.ReadAll(resp.Body)
     if err != nil {
         return nil, err

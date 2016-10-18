@@ -4,10 +4,10 @@ import (
     "net/http"
 )
 
-var state State
+var state *State
 
 func init() {
-    state = State{}
+    state = CreateNewState()
 }
 
 func main() {
