@@ -1,19 +1,19 @@
 package server
 
 import (
-    "net/http"
+	"net/http"
 )
 
 var state *State
 
 func init() {
-    state = CreateNewState()
+	state = CreateNewState()
 }
 
 func main() {
-    http.HandleFunc("/direct", directHandler)
-    http.HandleFunc("/append", appendHandler)
-    println("Running...")
-    println(http.ListenAndServe(":8080", nil))
-    println("Exiting...")
+	http.HandleFunc("/direct", directHandler)
+	http.HandleFunc("/append", appendHandler)
+	println("Running...")
+	println(http.ListenAndServe(":8080", nil))
+	println("Exiting...")
 }
