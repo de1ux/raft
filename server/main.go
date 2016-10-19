@@ -30,7 +30,7 @@ func consumeLogs() {
 }
 
 func handleElectionTimeout() {
-
+    //state.Transition(CANDIDATE)
 }
 
 func StartNewElectionTimer() *ElectionTimer {

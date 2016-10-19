@@ -6,7 +6,21 @@ import (
 )
 
 func directHandler(w http.ResponseWriter, r *http.Request) {
+    // TODO - if role is follower, respond with leader ID
+}
 
+// voteHandler is responsible for accepting vote solicitations
+func voteHandler(w http.ResponseWriter, r *http.Request) {
+    /*&RequestVoteResponse{
+        VoteGranted: false,
+        Term: state.currentTerm,
+    }*/
+
+    _, err := RequestVoteFromRequest(r)
+    if err != nil {
+        log.Print("WARN: ", err.Error())
+        return
+    }
 }
 
 // appendHandler receives AppendEntries RPCs from the leader and applies them
@@ -16,7 +30,7 @@ func appendHandler(w http.ResponseWriter, r *http.Request) {
 		Term:    state.currentTerm,
 	}
 
-	if state.role == Leader {
+	if state.role == LEADER {
 		log.Print("WARN: Leaders cannot take AppendEntries RPCs")
 		ar.Write(w)
 		return
@@ -24,7 +38,7 @@ func appendHandler(w http.ResponseWriter, r *http.Request) {
 
 	ae, err := AppendEntriesFromRequest(r)
 	if err != nil {
-		log.Printf("WARN: %s", err.Error())
+		log.Print("WARN: ", err.Error())
 		ar.Write(w)
 		return
 	}
