@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"bytes"
@@ -81,17 +81,18 @@ func (s *State) Commit(ae *AppendEntries) {
 		}
 	}
 
-	s.log.Rollback(keep)
-	s.log.Append(ae.Entries)
+    s.log.Rollback(keep)
+    s.log.Append(ae.Entries)
+    s.UpdateCommitIndex(ae.LeaderCommit)
+}
 
-	// Update our commit index to
-	if ae.LeaderCommit > s.commitIndex {
-		if ae.LeaderCommit > s.log.Length() {
-			s.commitIndex = s.log.Length()
-		} else {
-			s.commitIndex = ae.LeaderCommit
-		}
-	}
+// UpdateCommitIndex updates state's commit index if the AppendEntries RPC has
+// a higher leader commit index.
+// TODO - when would log.Length be greater than leaderCommitIndex?
+func (s *State) UpdateCommitIndex(leaderCommitIndex int) {
+    if leaderCommitIndex > s.commitIndex {
+        s.commitIndex = min(leaderCommitIndex, s.log.Length())
+    }
 }
 
 func (s *State) EntriesToString() string {

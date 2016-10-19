@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"log"
@@ -57,6 +57,7 @@ func appendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state.Commit(ae)
-	ar.Success = true
+    electionTimer.Reset()
+    ar.Success = true
 	ar.Write(w)
 }
