@@ -5,26 +5,40 @@ import (
 	"net/http"
 )
 
-func directHandler(w http.ResponseWriter, r *http.Request) {
+func directHandler(state *State, w http.ResponseWriter, r *http.Request) {
     // TODO - if role is follower, respond with leader ID
 }
 
 // voteHandler is responsible for accepting vote solicitations
-func voteHandler(w http.ResponseWriter, r *http.Request) {
-    /*&RequestVoteResponse{
+func voteHandler(state *State, w http.ResponseWriter, r *http.Request) {
+    rr := &RequestVoteResponse{
         VoteGranted: false,
         Term: state.currentTerm,
-    }*/
+    }
 
-    _, err := RequestVoteFromRequest(r)
+    rv, err := RequestVoteFromRequest(r)
     if err != nil {
         log.Print("WARN: ", err.Error())
+        rr.Write(w)
         return
     }
+
+    if rv.Term < state.currentTerm {
+        log.Print("WARN: Received vote solicitation from term ", rv.Term, ", current is ", state.currentTerm)
+        rr.Write(w)
+        return
+    }
+
+    if (state.votedFor == 0 || state.votedFor == rv.CandidateID) && (state.commitIndex == rv.LastLogIndex) {
+        rr.VoteGranted = true
+        electionTimer.Reset()
+    }
+
+    rr.Write(w)
 }
 
 // appendHandler receives AppendEntries RPCs from the leader and applies them
-func appendHandler(w http.ResponseWriter, r *http.Request) {
+func appendHandler(state *State, w http.ResponseWriter, r *http.Request) {
 	ar := &AppendEntriesResponse{
 		Success: false,
 		Term:    state.currentTerm,

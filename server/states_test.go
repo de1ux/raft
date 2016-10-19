@@ -96,7 +96,9 @@ func TestWriteAppendEntriesResponseAndReceive(t *testing.T) {
 }
 
 func TestAppendHandlerSuccess(t *testing.T) {
-	w := httptest.NewRecorder()
+	state := CreateNewState()
+
+    w := httptest.NewRecorder()
 	ae := &AppendEntries{
 		Term:         1,
 		LeaderID:     "2",
@@ -120,19 +122,22 @@ func TestAppendHandlerSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	appendHandler(w, req)
+    state.role = FOLLOWER
+	appendHandler(state, w, req)
 
 	if w.Result() == nil {
 		t.Fatal("Expected a result from appendHandler, got nil")
 	}
 	ar, err := AppendEntriesResponseFromRequest(w.Result())
 	if !ar.Success {
-		t.Fatal("Expected to pass")
+		t.Fatalf("Expected to pass: ", err)
 	}
 }
 
 func TestAppendHandlerOlderTerm(t *testing.T) {
-	w := httptest.NewRecorder()
+	state := CreateNewState()
+
+    w := httptest.NewRecorder()
 	ae := &AppendEntries{
 		Term:         -1,
 		LeaderID:     "2",
@@ -156,7 +161,7 @@ func TestAppendHandlerOlderTerm(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	appendHandler(w, req)
+	appendHandler(state, w, req)
 
 	if w.Result() == nil {
 		t.Fatal("Expected a result from appendHandler, got nil")
@@ -168,17 +173,18 @@ func TestAppendHandlerOlderTerm(t *testing.T) {
 }
 
 func TestAppendHandlerNotFollower(t *testing.T) {
-	w := httptest.NewRecorder()
-	ae := &AppendEntries{}
+	state := CreateNewState()
+    state.role = LEADER
 
-	state.role = Leader
+    w := httptest.NewRecorder()
+	ae := &AppendEntries{}
 
 	req, err := ae.ToRequest("example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	appendHandler(w, req)
+	appendHandler(state, w, req)
 
 	if w.Result() == nil {
 		t.Fatal("Expected a result from appendHandler, got nil")

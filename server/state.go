@@ -18,6 +18,7 @@ func CreateNewState() *State {
 		commitIndex: 0,
 		lastApplied: 0,
 		log:         &Log{},
+		role: FOLLOWER,
 	}
 }
 

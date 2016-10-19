@@ -51,12 +51,20 @@ func (e *ElectionTimer) Reset() {
     e.timer.Reset(e.duration)
 }
 
+type netHandler func(state *State, w http.ResponseWriter, r *http.Request)
+type plainHandler func(w http.ResponseWriter, r *http.Request)
+func stateMiddleware(handler netHandler) plainHandler {
+    return func(w http.ResponseWriter, r *http.Request) {
+        handler(state, w, r)
+    }
+}
+
 func main() {
     go consumeLogs()
     electionTimer = StartNewElectionTimer()
 
-    http.HandleFunc("/direct", directHandler)
-	http.HandleFunc("/append", appendHandler)
+    http.HandleFunc("/direct", stateMiddleware(directHandler))
+	http.HandleFunc("/append", stateMiddleware(appendHandler))
 	println("Running...")
 	println(http.ListenAndServe(":8080", nil))
 	println("Exiting...")
